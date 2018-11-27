@@ -3,11 +3,34 @@ package chat_server;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.security.*;
+import javax.crypto.Cipher;
+import jdk.nashorn.internal.objects.NativeArray;
+
+class Usuario{
+    String nombre;
+    String clave;
+    
+    public Usuario(String nombre, String clave){
+        this.nombre=nombre;
+        this.clave=clave;
+    }
+    
+    public String getNombre(){
+        return nombre;
+    }
+    public String getClave(){
+        return clave;
+    }
+    
+    
+}
 
 public class server_frame extends javax.swing.JFrame 
 {
+   Map<String,PublicKey> UsuKeys; 
    ArrayList clientOutputStreams;
-   ArrayList<String> users;
+   ArrayList<Usuario> usuarios;
 
    public class ClientHandler implements Runnable	
    {
@@ -36,33 +59,74 @@ public class server_frame extends javax.swing.JFrame
        {
             String message, connect = "Connect", disconnect = "Disconnect", chat = "Chat" ;
             String[] data;
-
+            
             try 
             {
                 while ((message = reader.readLine()) != null) 
                 {
-                    ta_chat.append("Received: " + message + "\n");
+                    //message tiene la linea que enviamos por socket
+                    ta_chat.append("Recivido: " + message + "\n");
                     data = message.split(":");
+                    System.out.println(message);
                     
-                    for (String token:data) 
-                    {
-                        ta_chat.append(token + "\n");
-                    }
+                    if(data.length>=3){
+                        if (data[2].equals(connect)) 
+                        {
+                            //Usuario:se ha conectado:Connect:ClavePublicaRSA
 
-                    if (data[2].equals(connect)) 
-                    {
-                        tellEveryone((data[0] + ":" + data[1] + ":" + chat));
-                        userAdd(data[0]);
-                    } 
-                    else if (data[2].equals(disconnect)) 
-                    {
-                        tellEveryone((data[0] + ":has disconnected." + ":" + chat));
-                        userRemove(data[0]);
-                    } 
-                    else if (data[2].equals(chat)) 
-                    {
-                        tellEveryone(message);
-                    } 
+                            //Comprobamos si es el primer usuario en conectares
+                            System.out.println("Entra al conectar usuario");
+                            tellEveryone((data[0] + ": entró al chat. :" + chat));
+                            userAdd(data[0],data[3]);
+
+
+                        }
+                        else if (data[2].equals(disconnect)) 
+                        {
+                            //Usuario:se ha desconectado:Disconnect
+                            tellEveryone((data[0] + ":se ha desconectado. :" + chat));
+                            userRemove(data[0]);
+                        } 
+                        else if (data[2].equals(chat)) 
+                        {
+                            //Usuario:mensaje:Chat
+                            tellEveryone(message);
+                        }else if(data[2].equals("ClaveAESEncriptada")){
+                            
+                            //Usuario que gestiona la clave:ClaveAESCifrada:ClaveAESEncriptada:Usuario2
+                            //Recibimos la clave AES encriptada y la enviamos al usuario que la solicito
+                            System.out.println("Recibimos la clave AES encriptada y la enviamos al usuario que la solicitó");
+                            
+                            tellEveryone(data[3]+":"+data[1]+":"+"ClaveAESDesencriptada");
+                            //Enviamos:       Usuario2:ClaveAES:ClaveAESDesencriptada
+                        }
+                    }else if(data.length>=2){
+                        if(data[1].equals("PedirAES")){
+                        
+                            if(usuarios.size()==1){
+                                //Creara la clave AES si no hay usuarios en la lista
+                                System.out.println("Es el primero y le enviamos un mensaje para que cree la clave AES");
+                                tellEveryone("CreaAES");
+                            }else{
+                                //Pedira la clave AES
+                                System.out.println("Ya hay una clave AES creada, envia un mensaje para soliticarla");
+                                Iterator it = usuarios.iterator();
+                                boolean check = false;
+
+                                //Buscamos la clave del usuario(data[0])
+                                String usuDestino = usuarios.get(0).getNombre();
+                                while(it.hasNext()){
+                                    Usuario usu = (Usuario)it.next();
+                                    if(usu.getNombre().equals(data[0]) && check==false){
+                                        check=true;
+                                        //Usuario que pide la clave:PeticionAES:ClavePublicaAES
+                                        tellEveryone(data[0]+":PeticionAES:"+usu.getClave()+":"+usuDestino);
+                                    }
+                                } 
+                            }
+                        }
+                    }
+                     
                     else 
                     {
                         ta_chat.append("No Conditions were met. \n");
@@ -71,7 +135,7 @@ public class server_frame extends javax.swing.JFrame
              } 
              catch (Exception ex) 
              {
-                ta_chat.append("Lost a connection. \n");
+                ta_chat.append("Conexión perdida. \n");
                 ex.printStackTrace();
                 clientOutputStreams.remove(client);
              } 
@@ -93,84 +157,63 @@ public class server_frame extends javax.swing.JFrame
         b_end = new javax.swing.JButton();
         b_users = new javax.swing.JButton();
         b_clear = new javax.swing.JButton();
+        jLabel1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Chat - Server's frame");
         setName("server"); // NOI18N
         setResizable(false);
+        getContentPane().setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
 
         ta_chat.setColumns(20);
         ta_chat.setRows(5);
         jScrollPane1.setViewportView(ta_chat);
 
-        b_start.setText("START");
+        getContentPane().add(jScrollPane1, new org.netbeans.lib.awtextra.AbsoluteConstraints(39, 101, 430, 278));
+
+        b_start.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        b_start.setText("Inicio");
         b_start.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 b_startActionPerformed(evt);
             }
         });
+        getContentPane().add(b_start, new org.netbeans.lib.awtextra.AbsoluteConstraints(62, 11, 176, -1));
 
-        b_end.setText("END");
+        b_end.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        b_end.setText("Cerrar");
         b_end.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 b_endActionPerformed(evt);
             }
         });
+        getContentPane().add(b_end, new org.netbeans.lib.awtextra.AbsoluteConstraints(62, 52, 176, -1));
 
-        b_users.setText("Online Users");
+        b_users.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        b_users.setText("Usuarios Conectados");
         b_users.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 b_usersActionPerformed(evt);
             }
         });
+        getContentPane().add(b_users, new org.netbeans.lib.awtextra.AbsoluteConstraints(248, 11, 192, -1));
 
-        b_clear.setText("Clear");
+        b_clear.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        b_clear.setText("Limpiar");
         b_clear.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 b_clearActionPerformed(evt);
             }
         });
+        getContentPane().add(b_clear, new org.netbeans.lib.awtextra.AbsoluteConstraints(380, 400, 77, -1));
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1)
-                    .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(b_end, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(b_start, javax.swing.GroupLayout.DEFAULT_SIZE, 75, Short.MAX_VALUE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 291, Short.MAX_VALUE)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(b_clear, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(b_users, javax.swing.GroupLayout.DEFAULT_SIZE, 103, Short.MAX_VALUE))))
-                .addContainerGap())
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 340, Short.MAX_VALUE)
-                .addGap(18, 18, 18)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(b_start)
-                    .addComponent(b_users))
-                .addGap(18, 18, 18)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(b_clear)
-                    .addComponent(b_end))
-                .addGap(20, 20, 20))
-        );
+        jLabel1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/imagenes/fondo_degradado_walimex_1_5x2m_azul.jpg"))); // NOI18N
+        getContentPane().add(jLabel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 0, 480, 460));
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void b_endActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_b_endActionPerformed
-        
-        //Al darle al boton de end esperamos 5 segundos y matamos el hilo
         try 
         {
             Thread.sleep(5000);                 //5000 milliseconds is five second.
@@ -178,27 +221,25 @@ public class server_frame extends javax.swing.JFrame
         catch(InterruptedException ex) {Thread.currentThread().interrupt();}
         
         tellEveryone("Server:is stopping and all users will be disconnected.\n:Chat");
-        ta_chat.append("Server stopping... \n");
+        ta_chat.append("Parando servidor... \n");
         
         ta_chat.setText("");
+        
     }//GEN-LAST:event_b_endActionPerformed
 
     private void b_startActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_b_startActionPerformed
-        
-        //Al darle al boton de start creamos un hilo y lo iniciamos
         Thread starter = new Thread(new ServerStart());
         starter.start();
+       
         
         ta_chat.append("Server started...\n");
     }//GEN-LAST:event_b_startActionPerformed
 
     private void b_usersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_b_usersActionPerformed
-        
-        //El boton de mostrar usuarios
-        ta_chat.append("\n Online users : \n");
-        for (String current_user : users)
+        ta_chat.append("\n Usuarios conectados : \n");
+        for (Usuario current_user : usuarios)
         {
-            ta_chat.append(current_user);
+            ta_chat.append(current_user.getNombre());
             ta_chat.append("\n");
         }    
         
@@ -225,7 +266,7 @@ public class server_frame extends javax.swing.JFrame
         public void run() 
         {
             clientOutputStreams = new ArrayList();
-            users = new ArrayList();  
+            usuarios = new ArrayList();  
 
             try 
             {
@@ -239,47 +280,52 @@ public class server_frame extends javax.swing.JFrame
 
                     Thread listener = new Thread(new ClientHandler(clientSock, writer));
                     listener.start();
-                    ta_chat.append("Got a connection. \n");
+                    ta_chat.append("Tenemos una conexión. \n");
                 }
             }
             catch (Exception ex)
             {
-                ta_chat.append("Error making a connection. \n");
+                ta_chat.append("Error al hacer la conexión. \n");
             }
         }
     }
     
-    public void userAdd (String data) 
+    public void userAdd (String name,String clave) 
     {
-        String message, add = ": :Connect", done = "Server: :Done", name = data;
-        ta_chat.append("Before " + name + " added. \n");
-        users.add(name);
-        ta_chat.append("After " + name + " added. \n");
-        String[] tempList = new String[(users.size())];
-        users.toArray(tempList);
+        String message, add = ": :Connect", done = "Server: :Done";
+        
+        Usuario usu = new Usuario(name,clave);
+        usuarios.add(usu);
 
-        for (String token:tempList) 
+        for (Usuario token:usuarios) 
         {
-            message = (token + add);
+            message = (token.getNombre() + add);
             tellEveryone(message);
         }
+        tellEveryone(done);
+        
+        
+    }
+    
+    public void userRemove (String name) 
+    {
+        String message, add = ": :Connect", done = "Server: :Done";
+        Iterator it = usuarios.iterator();
+        
+        while(it.hasNext()){
+            Usuario usu = (Usuario)it.next();
+            if(usu.getNombre().equals(name)){
+                it.remove();
+                message = (usu.getNombre() + add);
+                tellEveryone(message);
+            }
+        }
+
+        
         tellEveryone(done);
     }
     
-    public void userRemove (String data) 
-    {
-        String message, add = ": :Connect", done = "Server: :Done", name = data;
-        users.remove(name);
-        String[] tempList = new String[(users.size())];
-        users.toArray(tempList);
 
-        for (String token:tempList) 
-        {
-            message = (token + add);
-            tellEveryone(message);
-        }
-        tellEveryone(done);
-    }
     
     public void tellEveryone(String message) 
     {
@@ -291,7 +337,7 @@ public class server_frame extends javax.swing.JFrame
             {
                 PrintWriter writer = (PrintWriter) it.next();
 		writer.println(message);
-		ta_chat.append("Sending: " + message + "\n");
+		ta_chat.append("Enviando: " + message + "\n");
                 writer.flush();
                 ta_chat.setCaretPosition(ta_chat.getDocument().getLength());
 
@@ -308,6 +354,7 @@ public class server_frame extends javax.swing.JFrame
     private javax.swing.JButton b_end;
     private javax.swing.JButton b_start;
     private javax.swing.JButton b_users;
+    private javax.swing.JLabel jLabel1;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTextArea ta_chat;
     // End of variables declaration//GEN-END:variables
