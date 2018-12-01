@@ -130,54 +130,75 @@ public class client_frame extends javax.swing.JFrame
                      System.out.println(stream);
                      
                      //Tenemos que hacer una comprobacion de cuantos campos nos ha enviado el usuario para que al hacer data[2] no nos de un indexoutofbounds
-                     if(data.length>=3){
-                         if (data[2].equals(chat)) 
-                        {
+                     if(data.length==2){
+                         if(data[1].equals("CrearAES")){
+                         
+                            //CrearAES
+                            //El primer usuario crea la clave AES y no hace nada mas
+                            System.out.println("El primer usuario ha creado la clave AES");
+                            crearAES();
 
-                           ta_chat.append(data[0] + ":" + data[1] + "\n");
-                           ta_chat.setCaretPosition(ta_chat.getDocument().getLength());
-
-                        }else if (data[2].equals(connect))
-                        {
-                           //Usuario: :Connect
-                           ta_chat.removeAll();
-                           userAdd(data[0]);
-                        } 
-                        else if (data[2].equals(disconnect)) 
-                        {
+                        }
+                     }else if(data.length==3){
+                         if(data[2].equals(connect)){
+                            //Usuario: :Connect
+                            ta_chat.removeAll();
+                            userAdd(data[0]);
+                         }else if(data[2].equals(disconnect)){
                             userRemove(data[0]);
-                        } 
-                        else if (data[2].equals(done)) 
-                        { 
-                           writeUsers();
-                           users.clear();
-                        }else if(data[2].equals("ClaveAESDesencriptada") && data[0].equals(username)){
+                         }else if(data[2].equals(done)){
+                            writeUsers();
+                            users.clear();
+                         }else if(data[2].equals("ClaveAESDesencriptada") && data[0].equals(username)){
                             //Usuario2:ClaveAES:ClaveAESDesencriptada
                             //En el mensaje nos llegará la clave AES cifrada con nuestra clave publica y debemos desencriptarla
                             
                             System.out.println("El usuario recibe la clave AES y la desencripta con su clave privada");
-                             try {
-                                 Cipher rsa = Cipher.getInstance("RSA");
+                            try {
+                                Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                                 rsa.init(Cipher.DECRYPT_MODE, miClavePrivadaRSA);
+                                System.out.println(data[1]);
                                 claveAESBytes = rsa.doFinal(data[1].getBytes());
-                             } catch (NoSuchAlgorithmException e) {
+                            } catch (NoSuchAlgorithmException e) {
                                  e.printStackTrace();
-                             }
+                            }
                             
                             
+                        }
+                     }else if(data.length==4){
+                        
+                        if (data[2].equals(chat)) 
+                        {
+                            if(data[3].equals("MensajeDesencriptado")){
+                                //Usuario1:hola:Chat:MensajeDesencriptado
+                                Cipher aes = Cipher.getInstance("AES/ECB/PKCS5Padding");              
+                                SecretKeySpec sks = new SecretKeySpec(claveAESBytes, "AES");
+                                aes.init(Cipher.DECRYPT_MODE, sks);
+                                byte[] encriptado = aes.doFinal(data[1].getBytes());
+                                String mensajeDesencriptado = new String(encriptado);
+                                ta_chat.append(data[0] + ":" + mensajeDesencriptado + "\n");
+                                ta_chat.setCaretPosition(ta_chat.getDocument().getLength());
+                                
+                            }else{
+                                ta_chat.append(data[0] + ":" + data[1] + "\n");
+                                ta_chat.setCaretPosition(ta_chat.getDocument().getLength());
+                            }
                         }else if(data[1].equals("PeticionAES") && data[3].equals(username)){
                             //Usuario que la pide:PeticionAES:ClavePublicaBase64:Usuario que gestiona las claves
                             //Recoge la clavePublica del destinatario y ahora debe enviarle la clave AES encriptada con esa clave publica
                             
                             PublicKey pkUsuario = Base64ToClavePublica(data[2]);
                             //El envio sera tal que:   Usuario que gestiona las claves:ClaveAES:ClaveAESEncriptada:Usuario que pedia la clave
-                            System.out.println(pkUsuario);
+                            
                             String claveAESCifrada = null;
+                            
                             //TODO Segun entiendo se inicializa mal el encriptador y por eso falla al hacer el doFinal (acordarte de cambiar miClavePublicaRSA por pkUsuario
                             try {
                                 Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                                 rsa.init(Cipher.ENCRYPT_MODE, pkUsuario);
                                 claveAESCifrada = rsa.doFinal(claveAESBytes).toString();
+                                
+                                System.out.println("El usuario envia la clave AES encriptada con la clave publica del otro usuario");
                             } catch (InvalidKeyException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException ex) {
                                 ex.printStackTrace();
                             }
@@ -186,17 +207,9 @@ public class client_frame extends javax.swing.JFrame
                                writer.println(username+":"+claveAESCifrada+":"+"ClaveAESEncriptada"+":"+data[0]);
                                writer.flush();
                             } catch (Exception e) {
+                                
                             }
-                            System.out.println("El usuario envia la clave AES encriptada con la clave publica del otro usuario");
-
-                        }
-                     }else if(data.length>=1){
-                         if(data[0].equals("CrearAES")){
-                         
-                            //CrearAES
-                            //El primer usuario crea la clave AES y no hace nada mas
-                            System.out.println("El primer usuario ha creado la clave AES");
-                            crearAES();
+                            
 
                         }
                      }
@@ -204,6 +217,7 @@ public class client_frame extends javax.swing.JFrame
                      
                 }
            }catch(Exception ex) {
+               System.out.println(claveAESBytes);
                ex.printStackTrace();
            }
         }
@@ -327,12 +341,13 @@ public class client_frame extends javax.swing.JFrame
          
             if (!username.equals("")){
                 
-                //Creamos la clave privada y publica RSA
                 try {
+                    //Creamos la clave privada y publica RSA
                     crearParDeClavesRSA();
                 } catch (NoSuchAlgorithmException ex) {
                     Logger.getLogger(client_frame.class.getName()).log(Level.SEVERE, null, ex);
                 }
+                
                 
                 //Pasamos la clave publica a Base64
                 String clavePublicaBase64 = clavePublicaToBase64();
@@ -455,7 +470,16 @@ public class client_frame extends javax.swing.JFrame
             tf_chat.requestFocus();
         } else {
             try {
-               writer.println(username + ":" + tf_chat.getText() + ":" + "Chat");
+               String mensaje = tf_chat.getText();
+               Cipher aes = Cipher.getInstance("AES/ECB/PKCS5Padding");              
+               SecretKeySpec sks = new SecretKeySpec(claveAESBytes, "AES");
+               aes.init(Cipher.ENCRYPT_MODE, sks);
+               byte[] encriptado = aes.doFinal(mensaje.getBytes());
+               String mensajeEncriptado = new String(encriptado);
+               System.out.println(mensajeEncriptado);
+               
+               
+               writer.println(username + ":" + mensajeEncriptado + ":" + "Chat"+":"+"MensajeEncriptado");
                writer.flush(); // flushes the buffer
             } catch (Exception ex) {
                 ta_chat.append("El mensaje no se ha podido enviar. \n");
@@ -504,7 +528,7 @@ public class client_frame extends javax.swing.JFrame
         return RSAPublicaBase64;
     }
     
-    private PublicKey Base64ToClavePublica(String claveBase64) throws NoSuchAlgorithmException{
+    private PublicKey Base64ToClavePublica(String claveBase64) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
         byte[] decodi= Base64.getDecoder().decode(claveBase64);
         PublicKey pbdes = null;                  
                       

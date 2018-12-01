@@ -5,7 +5,6 @@ import java.net.*;
 import java.util.*;
 import java.security.*;
 import javax.crypto.Cipher;
-import jdk.nashorn.internal.objects.NativeArray;
 
 class Usuario{
     String nombre;
@@ -28,7 +27,7 @@ class Usuario{
 
 public class server_frame extends javax.swing.JFrame 
 {
-   Map<String,PublicKey> UsuKeys; 
+   
    ArrayList clientOutputStreams;
    ArrayList<Usuario> usuarios;
 
@@ -84,13 +83,19 @@ public class server_frame extends javax.swing.JFrame
                         else if (data[2].equals(disconnect)) 
                         {
                             //Usuario:se ha desconectado:Disconnect
-                            tellEveryone((data[0] + ":se ha desconectado. :" + chat));
+                            tellEveryone((data[0] + ":se ha desconectado. :" + chat+":"+"Conexion"));
                             userRemove(data[0]);
                         } 
                         else if (data[2].equals(chat)) 
                         {
-                            //Usuario:mensaje:Chat
-                            tellEveryone(message);
+                            if(data[3].equals("MensajeEncriptado")){
+                                //Usuario1:njauhsyfduhasdf:Chat:MensajeEncriptado
+                                tellEveryone(data[0]+":"+data[1]+":"+"Chat"+":"+"MensajeDesencriptado");
+                            }else{
+                                //Usuario:mensaje:Chat
+                                 tellEveryone(message);
+                            }
+                            
                         }else if(data[2].equals("ClaveAESEncriptada")){
                             
                             //Usuario que gestiona la clave:ClaveAESCifrada:ClaveAESEncriptada:Usuario2
@@ -106,7 +111,7 @@ public class server_frame extends javax.swing.JFrame
                             if(usuarios.size()==1){
                                 //Creara la clave AES si no hay usuarios en la lista
                                 System.out.println("Es el primero y le enviamos un mensaje para que cree la clave AES");
-                                tellEveryone("CreaAES");
+                                tellEveryone(data[0]+":"+"CrearAES");
                             }else{
                                 //Pedira la clave AES
                                 System.out.println("Ya hay una clave AES creada, envia un mensaje para soliticarla");
