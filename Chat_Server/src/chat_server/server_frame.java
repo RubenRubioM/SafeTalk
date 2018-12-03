@@ -66,7 +66,7 @@ public class server_frame extends javax.swing.JFrame
                     //message tiene la linea que enviamos por socket
                     ta_chat.append("Recivido: " + message + "\n");
                     data = message.split(":");
-                    System.out.println(message);
+                    //System.out.println(message);
                     
                     if(data.length>=3){
                         if (data[2].equals(connect)) 
@@ -90,6 +90,7 @@ public class server_frame extends javax.swing.JFrame
                         {
                             if(data[3].equals("MensajeEncriptado")){
                                 //Usuario1:njauhsyfduhasdf:Chat:MensajeEncriptado
+                                ta_chat.append(data[0]+": "+ data[1] + "\n");
                                 tellEveryone(data[0]+":"+data[1]+":"+"Chat"+":"+"MensajeDesencriptado");
                             }else{
                                 //Usuario:mensaje:Chat
