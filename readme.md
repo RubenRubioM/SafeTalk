@@ -12,7 +12,7 @@ This project is more about encryption and security than just a simple message sy
 
 In this app we use sockets to send the encrypted messages, we created our own protocol to implement that. 
 
-The first user to join the room generates the **AES** key and everytime the user want to send a message this will be encrypted with the recipient's public **RSA** key and later decrypted with their private **RSA** key. We also use **AES** to encrypt public **RSA** keys
+The first user to join the room generates the **AES** key and everytime the user wants to send a message this will be encrypted with the recipient's public **RSA** key and later decrypted with his private **RSA** key. We also use **AES** to encrypt public **RSA** keys
 
 ![Encryption scheme](pics/pic2.jpg)
 
